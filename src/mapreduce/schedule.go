@@ -33,34 +33,36 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	//
 	// Your code here (Part III, Part IV).
 	//
-	schedulePartIII(jobName, mapFiles, ntasks, n_other, phase, registerChan)
-	fmt.Printf("Schedule: %v done\n", phase)
-}
-
-func schedulePartIII(jobName string, mapFiles []string, phaseJobCount int, otherPhaseJobCount int, phase jobPhase, registerChan chan string) {
 	var wg sync.WaitGroup
-	wg.Add(phaseJobCount)
+	wg.Add(ntasks)
 
-	for i := 0; i < phaseJobCount; i++  {
+	for i := 0; i < ntasks; i++  {
 		task := DoTaskArgs{
 			JobName: jobName,
 			Phase: phase,
 			TaskNumber: i,
-			NumOtherPhase: otherPhaseJobCount,
+			NumOtherPhase: n_other,
 		}
 
 		if phase == mapPhase {
 			task.File = mapFiles[i]
 		}
 
-		worker := <-registerChan
-
 		go func() {
-			call(worker, "Worker.DoTask", task, nil)
-			wg.Done()
-			registerChan <- worker
+			for {
+				worker := <-registerChan
+				res := call(worker, "Worker.DoTask", task, nil)
+				if res {
+					wg.Done()
+					registerChan <- worker
+					break
+				}
+			}
+
 		}()
 
 	}
 	wg.Wait()
+	fmt.Printf("Schedule: %v done\n", phase)
 }
+
